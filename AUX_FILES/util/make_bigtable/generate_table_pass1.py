@@ -34,14 +34,16 @@ HMS_MAP = {
     "ps4" : find_variable(66,"Ps4_factor ="),
     "ps5" : find_variable(67,"Ps5_factor ="),
     "ps6" : find_variable(68,"Ps6_factor ="),
-    "pTRIG3" : find_variable(126,"pTRIG3 :"),
-    "pTRIG4" : find_variable(127,"pTRIG4 :"),
+    "pTRIG3" : find_variable(126,"["),
+    "pTRIG4" : find_variable(127,"["),
     "phys_triggers": find_variable(91,"Physics Triggers (current cut) :"),
     "hEL_REAL": find_variable(101,"hEL_REAL  :"),
     "pEL_REAL:": find_variable(120, "pEL_REAL  :"),
     "electr_deadtime": find_variable(175,"OG 6 GeV Electronic Live Time (100, 150) :"),
     "h_EL_CLEAN": find_variable(102,"hEL_CLEAN :"),
     "p_EL_CLEAN": find_variable(121,"pEL_CLEAN :"),
+    "ps3_comp_livetime": find_variable(159, "Pre-Scaled Ps3 HMS Computer Live Time :"),
+    "ps4_comp_livetime": find_variable(162, "Pre-Scaled Ps4 HMS Computer Live Time :")
 }
 
 SHMS_MAP = {
@@ -53,23 +55,26 @@ SHMS_MAP = {
     "BCM4A_I": find_variable(41,"BCM4A Beam Cut Current: "),
     "BCM4B_Q": find_variable(49,"BCM4B Beam Cut Charge: "),
     "BCM4B_I": find_variable(42,"BCM4B Beam Cut Current: "),
-    "BCM4C_Q": find_variable(50,"BCM4B Beam Cut Charge: "),
-    "BCM4C_I": find_variable(43,"BCM4C Beam Cut Charge: "),
+    "BCM4C_Q": find_variable(50,"BCM4C Beam Cut Charge: "),
+    "BCM4C_I": find_variable(43,"BCM4C Beam Cut Current: "),
     "p_esing_Eff": find_variable(377,"E SING FID TRACK EFFIC         :"),
     "p_hadron_Eff": find_variable(378,"HADRON SING FID TRACK EFFIC    :"),
-    "ps1" : find_variable(57,"Ps1_factor ="),
-    "ps2" : find_variable(58,"Ps2_factor ="),
-    "ps3" : find_variable(59,"Ps3_factor ="),
-    "ps4" : find_variable(60,"Ps4_factor ="),
-    "ps5" : find_variable(61,"Ps5_factor ="),
-    "ps6" : find_variable(62,"Ps6_factor ="),
-    "pTRIG1" : find_variable(116,"pTRIG1 :"),
-    "pTRIG2" : find_variable(117,"pTRIG4 :"),
-    "phys_triggers": find_variable(85,"Physics Triggers (current cut) :"),
-    "hEL_REAL": find_variable(112,"hEL_REAL  :"),
+    "ps1" : find_variable(63,"Ps1_factor ="),
+    "ps2" : find_variable(64,"Ps2_factor ="),
+    "ps3" : find_variable(65,"Ps3_factor ="),
+    "ps4" : find_variable(66,"Ps4_factor ="),
+    "ps5" : find_variable(67,"Ps5_factor ="),
+    "ps6" : find_variable(68,"Ps6_factor ="),
+    "pTRIG1" : find_variable(124,"["),
+    "pTRIG2" : find_variable(125,"["),
+    "phys_triggers": find_variable(89,"Physics 3/4 Triggers (current cut):"),
+    "hEL_REAL": find_variable(101,"hEL_REAL  :"),
+    "pEL_REAL:": find_variable(120, "pEL_REAL  :"),
     "electr_deadtime": find_variable(167,"OG 6 GeV Electronic Live Time (100, 150) :"),
     "h_EL_CLEAN": find_variable(102,"hEL_CLEAN :"),
     "p_EL_CLEAN": find_variable(121,"pEL_CLEAN :"),
+    "ps1_comp_livetime": find_variable(152, "Pre-Scaled Ps1 SHMS Computer Live Time :"),
+    "ps2_comp_livetime": find_variable(155, "Pre-Scaled Ps2 SHMS Computer Live Time :")
 }
 
 COIN_MAP = {
@@ -100,8 +105,8 @@ COIN_MAP = {
     "helicity_A": find_variable(1258,"BCM2  Helicity Gated Charge Asymmetry:"),
     "h_EL_CLEAN": find_variable(206,"HMS_hEL_CLEAN :"),
     "p_EL_CLEAN": find_variable(180,"SHMS_pEL_CLEAN :"),
-    "ps5_comp_livetime": find_variable(254,"ROC2 Pre-Scaled Ps5 ROC2 Computer Live Time (no BCM cut) :"),
-    "ps6_comp_livetime": find_variable(257,"ROC2 Pre-Scaled Ps6 ROC2 Computer Live Time (no BCM cut) :"),
+    "ps5_comp_livetime": find_variable(272,"ROC2 Pre-Scaled Ps5 Total Live Time (EDTM) (no BCM cut) :"),
+    "ps6_comp_livetime": find_variable(275,"ROC2 Pre-Scaled Ps6 Total Live Time (EDTM) (no BCM cut) :"),
 }
 
 run_type_map = {
@@ -323,7 +328,7 @@ def get_boil_corr(run_number, target, f, I, boil_corr_map):
     if period == "RsidisII":
         corr = boil_corr_map.get(str(run_number), {}).get("boil_corr", "")
         if corr in ("", None):
-            return -999, "RsidisII: run not in boiling_correction_factors.csv"
+            return -999, "RsidisII: run not in boiling_correction_factors_pass1.csv"
         return corr, None
 
     return -999, "run outside RsidisI and RsidisII ranges"
@@ -460,6 +465,31 @@ def helicity_charge_hm(C,A):
 
 
 
+# Which prescale triggers each report type uses for the computer livetime,
+# in order of priority (the first enabled trigger wins).
+LIVETIME_TRIGGERS = {
+    "HMS":  ("ps3", "ps4"),
+    "SHMS": ("ps1", "ps2"),
+    "COIN": ("ps5", "ps6"),
+}
+
+
+def select_comp_livetime(props, spectrometer):
+    # Returns (comp_livetime, trigger_used).
+    # A trigger is enabled when its prescale factor is > 0 (-1 means disabled).
+    # The livetime is read from the matching "<psN>_comp_livetime" report entry,
+    # given in %, and converted to a fraction capped at 1.
+    for ps in LIVETIME_TRIGGERS[spectrometer]:
+        factor = props.get(ps)
+        if factor is None or factor <= 0:
+            continue
+        livetime = props.get(f"{ps}_comp_livetime")
+        if livetime is None:
+            return -999, ps          # trigger enabled but its livetime line was not found
+        return min(round(livetime / 100, 5), 1.0), ps
+    return -999, None                # no enabled trigger
+
+
 def collect_run_info(input_csv, output_csv, run_type_map):
     keep_columns = ["run", "ebeam", "target", "hms_p", "hms_th", "shms_p", "shms_th", "run_type"] 
     results = []
@@ -467,7 +497,7 @@ def collect_run_info(input_csv, output_csv, run_type_map):
 
     # ihwp_map = load_ihwp_table("updated_merged_run_start_stop_log_100625.csv")
     coin_block_ratios_map = load_coin_block_ratios("coin_block_ratios_pass1.csv")
-    boil_corr_map = load_boil_corr("boiling_correction_factors.csv")
+    boil_corr_map = load_boil_corr("boiling_correction_factors_pass1.csv")
 
     with open(input_csv, newline="") as f:
         reader = csv.DictReader(f)
@@ -494,60 +524,22 @@ def collect_run_info(input_csv, output_csv, run_type_map):
             if report_path and os.path.exists(report_path):
                 props = parse_report_file(report_path, mapping)
 
+                # Computer livetime from the trigger that is actually enabled
+                spectrometer = next(k for k, v in run_type_map.items() if v is mapping)
+                props["comp_livetime"], lt_trigger = select_comp_livetime(props, spectrometer)
+                if props["comp_livetime"] == -999:
+                    issues.append({
+                        "run": run_number,
+                        "run_type": run_type,
+                        "issue": (f"comp_livetime: {lt_trigger} enabled but its livetime line was not found"
+                                  if lt_trigger else
+                                  f"comp_livetime: no enabled trigger among {LIVETIME_TRIGGERS[spectrometer]}")
+                    })
+
                 if mapping is run_type_map["COIN"]:
-                    ps1, ps2, ps3, ps4, ps5, ps6 = props.get("ps1"), props.get("ps2"), props.get("ps3"), props.get("ps4"), props.get("ps5"), props.get("ps6")
-                    ps5_comp_livetime = props.get("ps5_comp_livetime")
-                    ps6_comp_livetime = props.get("ps6_comp_livetime")
-
-                    props["comp_livetime"] = -999
-
-                    if ps5 not in (None, -999) and ps5 > 0:
-                        if ps5_comp_livetime not in (None, -999):
-                            props["comp_livetime"] = round(ps5_comp_livetime / 100, 5)
-
-                    elif ps6 not in (None, -999) and ps6 > 0:
-                        if ps6_comp_livetime not in (None, -999):
-                            props["comp_livetime"] = round(ps6_comp_livetime / 100, 5)
-                    
-#                    props["comp_livetime"] = 1.0
 # Uncomment when find out line number for helicity_A and helicity_C:
                     props["BCM2_Q_hp"] = helicity_charge_hp(props["helicity_C"], props["helicity_A"])
                     props["BCM2_Q_hm"] = helicity_charge_hm(props["helicity_C"], props["helicity_A"])
-                    
-                else:
-                    phys_triggers = props.get("phys_triggers")
-                    ps1, ps2, ps3, ps4, ps5, ps6 = props.get("ps1"), props.get("ps2"), props.get("ps3"), props.get("ps4"), props.get("ps5"), props.get("ps6")
-                    ps_values = [props.get(f"ps{i}", 1) for i in range(1, 7)]
-                    pTRIG1 = props.get("pTRIG1")
-                    pTRIG2 = props.get("pTRIG2")
-                    pTRIG3 = props.get("pTRIG3")
-                    pTRIG4 = props.get("pTRIG4")
-
-                    props["comp_livetime"] = -999
-
-                    if phys_triggers not in (None, -999):
-
-                        ps_product = 1
-                        for ps in ps_values:
-                            if ps in (None,-999):
-                                ps = 1
-                            ps_product *= ps
-
-                        # Determine livetime based on spectrometer type                          
-                        if mapping is run_type_map["HMS"]:
-                            if pTRIG3 and ps3 > 0:
-                                props["comp_livetime"] = round((-1 * ps_product * phys_triggers) / pTRIG3, 5)
-                            elif pTRIG4 and ps4 > 0:
-                                props["comp_livetime"] = round((-1 * ps_product * phys_triggers) / pTRIG4, 5)
-
-                        elif mapping is run_type_map["SHMS"]:
-                            if pTRIG1 and ps1 > 0:
-                                props["comp_livetime"] = round((-1 * ps_product * phys_triggers) / pTRIG1, 5)
-                            elif pTRIG2 and ps2 > 0:
-                                props["comp_livetime"] = round((-1 * ps_product * phys_triggers) / pTRIG2, 5)
-
-                        if props["comp_livetime"] > 1:
-                            props["comp_livetime"] = 1.0
 
 
                 if mapping is run_type_map["HMS"]:
@@ -635,11 +627,11 @@ def collect_run_info(input_csv, output_csv, run_type_map):
 "boil_corr",
 #start and stop times
 #"start_time", "stop_time",
-#"IHWP",
+"IHWP",
+#helicity based charge                                 
+"BCM2_Q_hp", "BCM2_Q_hm",
 #coin block ratio
 "coinblock_ratio",
-#helicity based charge                                 
-# "BCM2_Q_hp", "BCM2_Q_hm",
 "h_EL_CLEAN", "p_EL_CLEAN"]
 
     for row in results:
