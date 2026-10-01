@@ -24,10 +24,28 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Prepare site
-        run: |
-          mkdir site
-          cp -r AUX_FILES/* site/
-          touch site/.nojekyll
+      	run: |
+    	  mkdir site
+    	  cp AUX_FILES/rsidis_bigtable_pass1.html site/
+    	  cp AUX_FILES/rsidis_bigtable_pass1.csv site/
+
+    	  cat > site/index.html <<'EOF'
+    	  <!DOCTYPE html>
+   	  <html>
+    	  <head>
+	    <meta charset="UTF-8">
+            <title>RSIDIS Analysis</title>
+    	  </head>
+    	  <body>
+      	    <h1>RSIDIS Analysis</h1>
+      	    <p>
+              <a href="rsidis_bigtable_pass1.html">
+                RSIDIS Big Table — Pass 1
+              </a>
+      	    </p>
+    	  </body>
+    	  </html>
+   	  EOF
 
       - name: Upload Pages artifact
         id: deployment
