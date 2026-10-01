@@ -13,43 +13,46 @@ permissions:
 
 jobs:
   deploy:
+    runs-on: ubuntu-latest
+
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
-    runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
 
       - name: Prepare site
-      	run: |
-    	  mkdir site
-    	  cp AUX_FILES/rsidis_bigtable_pass1.html site/
-    	  cp AUX_FILES/rsidis_bigtable_pass1.csv site/
+        run: |
+          mkdir site
+          cp AUX_FILES/rsidis_bigtable_pass1.html site/
+          cp AUX_FILES/rsidis_bigtable_pass1.csv site/
 
-    	  cat > site/index.html <<'EOF'
-    	  <!DOCTYPE html>
-   	  <html>
-    	  <head>
-	    <meta charset="UTF-8">
+          cat > site/index.html <<'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8">
             <title>RSIDIS Analysis</title>
-    	  </head>
-    	  <body>
-      	    <h1>RSIDIS Analysis</h1>
-      	    <p>
+          </head>
+          <body>
+            <h1>RSIDIS Analysis</h1>
+            <p>
               <a href="rsidis_bigtable_pass1.html">
                 RSIDIS Big Table — Pass 1
               </a>
-      	    </p>
-    	  </body>
-    	  </html>
-   	  EOF
+            </p>
+          </body>
+          </html>
+          EOF
 
       - name: Upload Pages artifact
         id: deployment
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: site
 
