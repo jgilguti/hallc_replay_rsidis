@@ -39,7 +39,7 @@ HMS_MAP = {
     "phys_triggers": find_variable(91,"Physics Triggers (current cut) :"),
     "hEL_REAL": find_variable(101,"hEL_REAL  :"),
     "pEL_REAL:": find_variable(120, "pEL_REAL  :"),
-    "electr_deadtime": find_variable(175,"OG 6 GeV Electronic Live Time (100, 150) :"),
+    "electr_livetime": find_variable(175,"OG 6 GeV Electronic Live Time (100, 150) :"),
     "h_EL_CLEAN": find_variable(102,"hEL_CLEAN :"),
     "p_EL_CLEAN": find_variable(121,"pEL_CLEAN :"),
     "ps3_comp_livetime": find_variable(159, "Pre-Scaled Ps3 HMS Computer Live Time :"),
@@ -70,7 +70,7 @@ SHMS_MAP = {
     "phys_triggers": find_variable(89,"Physics 3/4 Triggers (current cut):"),
     "hEL_REAL": find_variable(101,"hEL_REAL  :"),
     "pEL_REAL:": find_variable(120, "pEL_REAL  :"),
-    "electr_deadtime": find_variable(167,"OG 6 GeV Electronic Live Time (100, 150) :"),
+    "electr_livetime": find_variable(167,"OG 6 GeV Electronic Live Time (100, 150) :"),
     "h_EL_CLEAN": find_variable(102,"hEL_CLEAN :"),
     "p_EL_CLEAN": find_variable(121,"pEL_CLEAN :"),
     "ps1_comp_livetime": find_variable(152, "Pre-Scaled Ps1 SHMS Computer Live Time :"),
@@ -100,13 +100,13 @@ COIN_MAP = {
     "ps6" : find_variable(110,"Ps6_factor ="),
     "phys_triggers": find_variable(146,"HMS Accepted Physics Triggers       :"),
     "hEL_REAL": find_variable(205,"HMS_hEL_REAL  :"),
-    "electr_deadtime": find_variable(279,"ROC2 OG 6 GeV Electronic Dead Time (100, 150) (no BCM cut) :"),
+    "electr_livetime": find_variable(278,"ROC2 OG 6 GeV Electronic Live Time (100, 150) (no BCM cut) :"),
     "helicity_C": find_variable(1248,"BCM2  Helicity Gated Charge:"),
     "helicity_A": find_variable(1258,"BCM2  Helicity Gated Charge Asymmetry:"),
     "h_EL_CLEAN": find_variable(206,"HMS_hEL_CLEAN :"),
     "p_EL_CLEAN": find_variable(180,"SHMS_pEL_CLEAN :"),
-    "ps5_comp_livetime": find_variable(272,"ROC2 Pre-Scaled Ps5 Total Live Time (EDTM) (no BCM cut) :"),
-    "ps6_comp_livetime": find_variable(275,"ROC2 Pre-Scaled Ps6 Total Live Time (EDTM) (no BCM cut) :"),
+    "ps5_comp_livetime": find_variable(254,"ROC2 Pre-Scaled Ps5 ROC2 Computer Live Time (no BCM cut) :"),
+    "ps6_comp_livetime": find_variable(257,"ROC2 Pre-Scaled Ps6 ROC2 Computer Live Time (no BCM cut) :"),
 }
 
 run_type_map = {
@@ -114,6 +114,34 @@ run_type_map = {
     "SHMS": SHMS_MAP,
     "COIN": COIN_MAP,
 }
+
+# === Run-dependent line numbers ===
+# Some report entries sit on a different line for part of the run range.
+# Each entry: (first_run, last_run, {variable: line_number}), both ends included.
+# The label text searched for stays the one defined in the map above.
+#LINE_OVERRIDES = {
+#    "HMS": [],
+#    "SHMS": [],
+#    "COIN": [
+#        (23839, 24874, {"ps5_comp_livetime": 254, "ps6_comp_livetime": 257}),
+#    ],
+#}
+
+
+#def mapping_for_run(spectrometer, run_number):
+    # Returns the map to parse this run's report with: the standard map,
+    # with any line numbers replaced for runs inside an override range.
+#    mapping = dict(run_type_map[spectrometer])
+#    try:
+#        run = int(run_number)
+#    except (TypeError, ValueError):
+#        return mapping
+#    for first_run, last_run, new_lines in LINE_OVERRIDES.get(spectrometer, []):
+#        if first_run <= run <= last_run:
+#            for var, line_number in new_lines.items():
+#                _, pattern = mapping[var]
+#                mapping[var] = find_variable(line_number, pattern)
+#    return mapping
 
 def parse_report_file(report_path, mapping):
     props = {}
@@ -522,10 +550,19 @@ def collect_run_info(input_csv, output_csv, run_type_map):
             # Extract variables
             props = {}
             if report_path and os.path.exists(report_path):
+#                spectrometer = next(k for k, v in run_type_map.items() if v is mapping)
+#                props = parse_report_file(report_path, mapping_for_run(spectrometer, run_number))
+
                 props = parse_report_file(report_path, mapping)
 
                 # Computer livetime from the trigger that is actually enabled
                 spectrometer = next(k for k, v in run_type_map.items() if v is mapping)
+                
+                # Converts livetime from percentage to fraction
+                if props.get("electr_livetime") is not None:
+                    props["electr_livetime"] = round(props["electr_livetime"] / 100, 8)
+
+                # Computer livetime from the trigger that is actually enabled
                 props["comp_livetime"], lt_trigger = select_comp_livetime(props, spectrometer)
                 if props["comp_livetime"] == -999:
                     issues.append({
@@ -619,7 +656,7 @@ def collect_run_info(input_csv, output_csv, run_type_map):
             
 
     # Write results to CSV
-    fieldnames = keep_columns + ["x","Q2","z","thpq","BCM1_Q","BCM1_I","BCM2_Q","BCM2_I","BCM4A_Q","BCM4A_I","BCM4B_Q","BCM4B_I","BCM4C_Q","BCM4C_I","h_esing_Eff","h_hadron_Eff","p_esing_Eff","p_hadron_Eff","ps1","ps2","ps3","ps4","ps5","ps6","comp_livetime","electr_deadtime",
+    fieldnames = keep_columns + ["x","Q2","z","thpq","BCM1_Q","BCM1_I","BCM2_Q","BCM2_I","BCM4A_Q","BCM4A_I","BCM4B_Q","BCM4B_I","BCM4C_Q","BCM4C_I","h_esing_Eff","h_hadron_Eff","p_esing_Eff","p_hadron_Eff","ps1","ps2","ps3","ps4","ps5","ps6","comp_livetime","electr_livetime",
 #get_good_coin_events variables:
 "coin", "ransubcoin", "ransubcoin_err", "normyield", "normyield_err", "ctmean","ctsigma",
 #fan speed variables:
